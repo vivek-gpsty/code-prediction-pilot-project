@@ -23,7 +23,8 @@ const items = [
 ];
 
 export function AppSidebar() {
-  const { collapsed } = useSidebar();
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
   const [menuOpen, setMenuOpen] = useState(true);
 
   const getNavCls = ({ isActive }: { isActive: boolean }) =>
@@ -32,10 +33,10 @@ export function AppSidebar() {
       : "text-gray-700 hover:bg-gray-100";
 
   return (
-    <Sidebar className={collapsed ? "w-14" : "w-64"} collapsible>
+    <Sidebar className={isCollapsed ? "w-14" : "w-64"} collapsible="offcanvas">
       <SidebarContent className="bg-white">
         <div className="p-4 border-b flex items-center justify-between">
-          {!collapsed && (
+          {!isCollapsed && (
             <>
               <div className="flex items-center gap-2">
                 <X className="w-4 h-4 text-gray-400" />
@@ -53,7 +54,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end className={getNavCls}>
                       <item.icon className="w-4 h-4 mr-3" />
-                      {!collapsed && <span className="text-sm">{item.title}</span>}
+                      {!isCollapsed && <span className="text-sm">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

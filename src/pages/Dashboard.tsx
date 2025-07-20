@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import PredictionResults from "@/components/PredictionResults";
+import { AgGridReact } from 'ag-grid-react';
+import 'ag-grid-community/styles/ag-grid.css';
+import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 const Dashboard = () => {
   const [selectedMaterial, setSelectedMaterial] = useState<any>(null);
@@ -104,6 +107,152 @@ const Dashboard = () => {
       </Badge>
     );
   };
+
+  const columnDefs = useMemo(() => [
+    { 
+      headerName: "Material name", 
+      field: "name" as keyof typeof materialsData[0], 
+      width: 120,
+      pinned: 'left' as 'left'
+    },
+    { 
+      headerName: "Material definition", 
+      field: "definition" as keyof typeof materialsData[0], 
+      width: 200,
+      cellRenderer: (params: any) => (
+        <div className="truncate" title={params.value}>
+          {params.value}
+        </div>
+      )
+    },
+    { 
+      headerName: "Saved P-code", 
+      field: "savedPCode" as keyof typeof materialsData[0], 
+      width: 120,
+      editable: true,
+      cellRenderer: (params: any) => {
+        const isEditing = editingRow === params.data.id;
+        const isDifferent = params.data.savedPCode !== params.data.predictedPCode;
+        
+        return isEditing ? (
+          <Input 
+            value={editValues[`${params.data.id}-savedPCode`] || params.value}
+            onChange={(e) => handleEdit(params.data.id, 'savedPCode', e.target.value)}
+            className="w-16 h-6 text-xs"
+          />
+        ) : (
+          <div className="flex items-center gap-1">
+            {params.value}
+            {isDifferent && (
+              <button 
+                onClick={() => setEditingRow(params.data.id)}
+                className="text-blue-600 hover:text-blue-800 text-xs"
+              >
+                ✏️
+              </button>
+            )}
+          </div>
+        );
+      }
+    },
+    { 
+      headerName: "Predicted P-code", 
+      field: "predictedPCode" as keyof typeof materialsData[0], 
+      width: 130,
+      cellRenderer: (params: any) => (
+        <div className="flex items-center gap-2">
+          {params.value}
+          {params.data.confidence === 'high' && <div className="w-2 h-2 bg-teal-500 rounded-full"></div>}
+          {params.data.confidence === 'moderate' && <div className="w-2 h-2 bg-amber-500 rounded-full"></div>}
+          {params.data.confidence === 'low' && <div className="w-2 h-2 bg-red-500 rounded-full"></div>}
+        </div>
+      )
+    },
+    { 
+      headerName: "Saved material gr", 
+      field: "savedMaterialGr" as keyof typeof materialsData[0], 
+      width: 130
+    },
+    { 
+      headerName: "Predicted material gr", 
+      field: "predictedMaterialGr" as keyof typeof materialsData[0], 
+      width: 150,
+      cellRenderer: (params: any) => (
+        <div className="flex items-center gap-2">
+          {params.value}
+          <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+        </div>
+      )
+    },
+    { 
+      headerName: "Saved ext material...", 
+      field: "savedExtMaterial" as keyof typeof materialsData[0], 
+      width: 140
+    },
+    { 
+      headerName: "Predicted ext mater...", 
+      field: "predictedExtMaterial" as keyof typeof materialsData[0], 
+      width: 150,
+      cellRenderer: (params: any) => (
+        <div className="flex items-center gap-2">
+          {params.value}
+          {params.data.confidence === 'moderate' && <div className="w-2 h-2 bg-amber-500 rounded-full"></div>}
+        </div>
+      )
+    },
+    { 
+      headerName: "F1 Score", 
+      field: "f1Score" as keyof typeof materialsData[0], 
+      width: 100
+    },
+    { 
+      headerName: "Verdict", 
+      field: "confidence" as keyof typeof materialsData[0], 
+      width: 140,
+      cellRenderer: (params: any) => getConfidenceBadge(params.value)
+    },
+    { 
+      headerName: "Action recommended", 
+      colId: "actionRecommended", 
+      width: 150,
+      cellRenderer: (params: any) => (
+        <span className="text-xs">
+          {params.data.confidence === 'high' ? 'Manual prediction' : 'Manual cross check'}
+        </span>
+      )
+    },
+    { 
+      headerName: "", 
+      colId: "actions", 
+      width: 120,
+      pinned: 'right' as 'right',
+      cellRenderer: (params: any) => {
+        const isEditing = editingRow === params.data.id;
+        
+        return isEditing ? (
+          <Button size="sm" onClick={() => handleSave(params.data.id)}>
+            Save
+          </Button>
+        ) : (
+          <Button 
+            variant="link" 
+            size="sm"
+            onClick={() => handleViewDetails(params.data)}
+            className="text-blue-600 hover:text-blue-800 p-0"
+          >
+            View details
+          </Button>
+        );
+      }
+    }
+  ], [editingRow, editValues]);
+
+  const defaultColDef = useMemo(() => ({
+    resizable: true,
+    sortable: true,
+    filter: true,
+    floatingFilter: true
+  }), []);
 
   return (
     <div className="p-6 space-y-6">
@@ -227,99 +376,18 @@ const Dashboard = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-2">Material name</th>
-                  <th className="text-left py-3 px-2">Material definition</th>
-                  <th className="text-left py-3 px-2">Saved P-code</th>
-                  <th className="text-left py-3 px-2">Predicted P-code</th>
-                  <th className="text-left py-3 px-2">Saved material gr</th>
-                  <th className="text-left py-3 px-2">Predicted material gr</th>
-                  <th className="text-left py-3 px-2">Saved ext material...</th>
-                  <th className="text-left py-3 px-2">Predicted ext mater...</th>
-                  <th className="text-left py-3 px-2">F1 Score</th>
-                  <th className="text-left py-3 px-2">Verdict</th>
-                  <th className="text-left py-3 px-2">Action recommended</th>
-                  <th className="text-left py-3 px-2"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {materialsData.map((material) => (
-                  <tr key={material.id} className="border-b hover:bg-gray-50">
-                    <td className="py-3 px-2">{material.name}</td>
-                    <td className="py-3 px-2">{material.definition}</td>
-                    <td className="py-3 px-2">
-                      {editingRow === material.id ? (
-                        <Input 
-                          value={editValues[`${material.id}-savedPCode`] || material.savedPCode}
-                          onChange={(e) => handleEdit(material.id, 'savedPCode', e.target.value)}
-                          className="w-16 h-6 text-xs"
-                        />
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          {material.savedPCode}
-                          {material.savedPCode !== material.predictedPCode && (
-                            <button 
-                              onClick={() => setEditingRow(material.id)}
-                              className="text-blue-600 hover:text-blue-800 text-xs"
-                            >
-                              ✏️
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-3 px-2">
-                      <div className="flex items-center gap-2">
-                        {material.predictedPCode}
-                        {material.confidence === 'high' && <div className="w-2 h-2 bg-teal-500 rounded-full"></div>}
-                        {material.confidence === 'moderate' && <div className="w-2 h-2 bg-amber-500 rounded-full"></div>}
-                        {material.confidence === 'low' && <div className="w-2 h-2 bg-red-500 rounded-full"></div>}
-                      </div>
-                    </td>
-                    <td className="py-3 px-2">{material.savedMaterialGr}</td>
-                    <td className="py-3 px-2">
-                      <div className="flex items-center gap-2">
-                        {material.predictedMaterialGr}
-                        <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2">{material.savedExtMaterial}</td>
-                    <td className="py-3 px-2">
-                      <div className="flex items-center gap-2">
-                        {material.predictedExtMaterial}
-                        {material.confidence === 'moderate' && <div className="w-2 h-2 bg-amber-500 rounded-full"></div>}
-                      </div>
-                    </td>
-                    <td className="py-3 px-2">{material.f1Score}</td>
-                    <td className="py-3 px-2">
-                      {getConfidenceBadge(material.confidence)}
-                    </td>
-                    <td className="py-3 px-2 text-xs">
-                      {material.confidence === 'high' ? 'Manual prediction' : 'Manual cross check'}
-                    </td>
-                    <td className="py-3 px-2">
-                      {editingRow === material.id ? (
-                        <Button size="sm" onClick={() => handleSave(material.id)}>
-                          Save
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="link" 
-                          size="sm"
-                          onClick={() => handleViewDetails(material)}
-                          className="text-blue-600 hover:text-blue-800 p-0"
-                        >
-                          View details
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="ag-theme-alpine" style={{ height: 400, width: '100%' }}>
+            <AgGridReact
+              rowData={materialsData}
+              columnDefs={columnDefs}
+              defaultColDef={defaultColDef}
+              animateRows={true}
+              rowSelection="single"
+              suppressMovableColumns={true}
+              pagination={true}
+              paginationPageSize={10}
+              domLayout="normal"
+            />
           </div>
         </CardContent>
       </Card>
